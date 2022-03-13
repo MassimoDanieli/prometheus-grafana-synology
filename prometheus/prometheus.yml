@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets: []
+    scheme: http
+    timeout: 10s
+    api_version: v1
+scrape_configs:
+- job_name: prometheus
+  honor_timestamps: true
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  metrics_path: /metrics
+  scheme: http
+  static_configs:
+    - targets: ['localhost:9090','node-exporter:9100', '192.168.0.26:9100', '192.168.0.17:9999', '192.168.0.67:9182']
+- job_name: 'snmp-exporter'
+  static_configs:
+  - targets: ['192.168.0.10']
+  metrics_path: /snmp
+  params:
+    module: [synology]
+  relabel_configs:
+    - source_labels: [__address__]
+      target_label: __param_target
+    - source_labels: [__param_target]
+      target_label: instance
+    - target_label: __address__
+      replacement: 192.168.0.46:9116  # The SNMP exporter's real hostname:port.       
