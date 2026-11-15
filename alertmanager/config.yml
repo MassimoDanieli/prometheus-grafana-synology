@@ -1,10 +1,10 @@
 route:
-  receiver: 'slack'
+  receiver: default
 
 receivers:
-  - name: 'slack'
-#       slack_configs:
-#           - send_resolved: true
-#             username: '<username>'
-#             channel: '#<channel-name>'
-#             api_url: '<incomming-webhook-url>'
+  # Alerts go nowhere until a notifier is configured, for example Slack:
+  - name: default
+    # slack_configs:
+    #   - send_resolved: true
+    #     api_url: '<incoming-webhook-url>'
+    #     channel: '#<channel-name>'

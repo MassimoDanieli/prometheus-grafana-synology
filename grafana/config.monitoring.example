@@ -1,0 +1,6 @@
+# Copy to grafana/config.monitoring (git-ignored) and fill in.
+#   cp grafana/config.monitoring.example grafana/config.monitoring
+GF_SECURITY_ADMIN_PASSWORD=change-me
+# 32+ random characters, e.g.: openssl rand -hex 24
+GF_SECURITY_SECRET_KEY=change-me
+GF_USERS_ALLOW_SIGN_UP=false

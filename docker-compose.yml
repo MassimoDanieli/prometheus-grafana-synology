@@ -1,47 +1,45 @@
-version: "3.7"
-
+# Monitoring stack for a Synology NAS: Prometheus, Alertmanager, Grafana,
+# node-exporter, cAdvisor and the SNMP exporter.
+#
+# Before the first start:
+#   cp grafana/config.monitoring.example grafana/config.monitoring   # set passwords
+#   edit prometheus/prometheus.yml                                   # your targets
+#
+# Images are pinned (they used to be :latest, which broke this stack when
+# snmp_exporter, node_exporter and Prometheus changed their configuration).
 
 volumes:
-    prometheus_data: {}
-    grafana_data: {}
+  prometheus_data: {}
+  grafana_data: {}
 
 networks:
   front-tier:
   back-tier:
 
-
 services:
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.16.0
     volumes:
-            - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-            - prometheus_data:/prometheus
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
     ports:
       - 9090:9090
-    links:
-      - cadvisor:cadvisor
-      - alertmanager:alertmanager
     depends_on:
       - cadvisor
+      - alertmanager
     networks:
       - back-tier
     restart: always
-    ports:
-      - 9090:9090
 
   cadvisor:
-    # use this on NON ARM cumputer
-    #image: gcr.io/cadvisor/cadvisor
-    # Use this one for ARM (as in Raspberry)
-    image: zcube/cadvisor:latest
+    # Multi-arch (amd64 and arm64, Raspberry Pi included).
+    image: gcr.io/cadvisor/cadvisor:v0.60.6
     volumes:
       - /:/rootfs:ro
-      - /var/run:/var/run:rw
+      - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
     ports:
@@ -49,15 +47,13 @@ services:
     networks:
       - back-tier
     restart: always
-    deploy:
-      mode: global
 
   alertmanager:
-    image: prom/alertmanager
+    image: prom/alertmanager:v0.35.0
     ports:
       - 9093:9093
     volumes:
-      - ./alertmanager/:/etc/alertmanager/
+      - ./alertmanager/:/etc/alertmanager/:ro
     networks:
       - back-tier
     restart: always
@@ -66,14 +62,14 @@ services:
       - '--storage.path=/alertmanager'
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:13.3.1
     user: "472"
     depends_on:
-      - prometheus  
+      - prometheus
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./grafana/grafana.ini:/etc/grafana/grafana.ini
-      - ./grafana/provisioning/:/etc/grafana/provisioning/
+      - ./grafana/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning/:/etc/grafana/provisioning/:ro
     ports:
       - 3000:3000
     env_file:
@@ -84,36 +80,33 @@ services:
     restart: always
 
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.12.1
     container_name: monitoring_node_exporter
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
-    command: 
-      - '--path.procfs=/host/proc' 
+    command:
+      - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
-      - --collector.filesystem.ignored-mount-points
-      - "^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+      - '--path.rootfs=/rootfs'
+      # was --collector.filesystem.ignored-mount-points, removed from node_exporter
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)'
     ports:
       - 9100:9100
     networks:
       - back-tier
     restart: always
-    deploy:
-      mode: global 
 
   snmp_exporter:
-    image: prom/snmp-exporter:latest
+    image: prom/snmp-exporter:v0.31.0
     container_name: monitoring_snmp_exporter
     restart: unless-stopped
     ports:
       - 9116:9116
     networks:
-      - back-tier    
+      - back-tier
     volumes:
-      - ./snmp_exporter/snmp.yml:/etc/snmp_exporter/snmp.yml
+      - ./snmp_exporter/snmp.yml:/etc/snmp_exporter/snmp.yml:ro
     command:
-      - "--config.file=/etc/snmp_exporter/snmp.yml"    
-
-
+      - "--config.file=/etc/snmp_exporter/snmp.yml"
