@@ -1,0 +1,33 @@
+name: Validate configuration
+
+# Checks every config with the same image versions docker-compose.yml runs.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: docker compose config
+        run: |
+          cp grafana/config.monitoring.example grafana/config.monitoring
+          docker compose config --quiet
+      - name: Prometheus (promtool)
+        run: docker run --rm -v "$PWD/prometheus:/cfg:ro" --entrypoint promtool prom/prometheus:v3.16.0 check config /cfg/prometheus.yml
+      - name: Alertmanager (amtool)
+        run: docker run --rm -v "$PWD/alertmanager:/cfg:ro" --entrypoint amtool prom/alertmanager:v0.35.0 check-config /cfg/config.yml
+      - name: SNMP exporter
+        run: docker run --rm -v "$PWD/snmp_exporter:/cfg:ro" prom/snmp-exporter:v0.31.0 --config.file=/cfg/snmp.yml --dry-run
+      - name: Grafana provisioning is valid JSON/YAML
+        run: |
+          python3 -c "import json,glob; [json.load(open(f)) for f in glob.glob('grafana/provisioning/**/*.json', recursive=True)]"
+          python3 -c "import yaml,glob; [yaml.safe_load(open(f)) for f in glob.glob('grafana/provisioning/**/*.yml', recursive=True)]"
+      - name: No secrets committed
+        run: |
+          ! grep -RInE 'GF_SECURITY_(ADMIN_PASSWORD|SECRET_KEY)=[^c]|^secret_key *= *[A-Za-z0-9]{8,}' --include='*' . --exclude-dir=.git

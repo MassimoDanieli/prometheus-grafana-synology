@@ -1,13 +1,31 @@
 # prometheus-grafana-synology
-Monitoring Synology NAS with Prometheus and Grafana
 
+Monitoraggio di un NAS Synology con Prometheus e Grafana, pensato per girare su un Raspberry Pi (ma va anche su amd64).
 
+| Servizio | Porta | |
+|---|---|---|
+| Prometheus | 9090 | raccoglie le metriche |
+| Grafana | 3000 | dashboard `Synology-NAS` già configurata |
+| Alertmanager | 9093 | notifiche (da configurare) |
+| SNMP exporter | 9116 | legge il NAS via SNMP |
+| node-exporter | 9100 | la macchina che ospita lo stack |
+| cAdvisor | 8080 | i container |
 
-Ocio che 
+## Avvio
 
-1) e' fatto per il raspino, su un altra macchina modificate il docker-compose.yml (la riga per non arm e' commentata)
-2) bisogna ovviamente modificare i target in prometheus.yml
-3) e' molto facile che mi sia scordato qualcosa hardcoded, nel caso chiedere
-4) potrei scrivere un readme ma preferisco farmi una pasta
-5) assume the la com sia public (si lo so che non si deve fare) senno cofigurate la vostra in snmp.yml
-6) per le regole di alert vi arrangiate che ho fame
+```bash
+cp grafana/config.monitoring.example grafana/config.monitoring   # password admin e secret key di Grafana
+$EDITOR prometheus/prometheus.yml                                # IP del NAS e delle altre macchine
+docker compose up -d
+```
+
+Poi Grafana su `http://<host>:3000` (utente `admin`, password quella messa in `config.monitoring`).
+
+## Da sapere
+
+- **SNMP**: sul NAS va attivato SNMP v2c (Pannello di controllo → Terminale e SNMP). La community è `public` in `snmp_exporter/snmp.yml`, sotto `auths:`. Meglio cambiarla, sia lì sia sul NAS.
+- **Target**: gli indirizzi `192.168.0.x` in `prometheus/prometheus.yml` sono quelli di casa mia. Vanno cambiati.
+- **Alert**: Alertmanager è collegato a Prometheus, ma i messaggi non vanno da nessuna parte finché non configuri un notifier in `alertmanager/config.yml` (c'è un esempio Slack commentato). Le regole di alert sono a parte.
+- **Versioni**: le immagini sono fissate. Con `:latest` lo stack si rompeva quando snmp_exporter, node_exporter e Prometheus cambiavano formato di configurazione.
+
+La CI controlla ogni modifica con gli stessi strumenti e le stesse versioni: `docker compose config`, `promtool`, `amtool`, `snmp_exporter --dry-run`.
